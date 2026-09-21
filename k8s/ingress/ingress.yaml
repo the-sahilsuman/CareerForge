@@ -1,0 +1,54 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: careerforge
+  namespace: careerforge
+
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+
+spec:
+  ingressClassName: nginx
+
+  rules:
+    - host: careerforge.com
+
+      http:
+        paths:
+
+          - path: /agentic
+            pathType: Prefix
+
+            backend:
+              service:
+                name: agentic-service
+                port:
+                  number: 8001
+
+          # --------------------------------------------------
+          # API
+          # --------------------------------------------------
+          - path: /backend
+            pathType: Prefix
+
+            backend:
+              service:
+                name: core-backend
+                port:
+                  number: 8000
+
+          # --------------------------------------------------
+          # Frontend
+          # --------------------------------------------------
+          - path: /
+            pathType: Prefix
+
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

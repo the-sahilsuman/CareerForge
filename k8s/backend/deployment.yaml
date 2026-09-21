@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-backend
+  namespace: careerforge
+  labels:
+    app: core-backend
+    app.kubernetes.io/part-of: careerforge
+
+spec:
+  replicas: 2
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  selector:
+    matchLabels:
+      app: core-backend
+
+  template:
+    metadata:
+      labels:
+        app: core-backend
+        app.kubernetes.io/part-of: careerforge
+
+    spec:
+      serviceAccountName: core-backend
+
+      containers:
+        - name: core-backend
+
+          image: ACCOUNT_ID.dkr.ecr.ap-south-1.amazonaws.com/careerforge-core-backend:IMAGE_TAG
+
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 8000
+
+          envFrom:
+
+            # Non-sensitive configuration
+            - configMapRef:
+                name: core-backend-config
+
+            # Sensitive configuration
+            - secretRef:
+                name: core-backend-secret
+
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          terminationMessagePolicy: File
+
+      terminationGracePeriodSeconds: 30

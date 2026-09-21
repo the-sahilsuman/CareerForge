@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: core-backend-config
+  namespace: careerforge
+data:
+  ENVIRONMENT: "production"
+
+  AWS_REGION: "ap-south-1"
+
+  # Internal Kubernetes communication
+  AGENTIC_SERVICE_URL: "http://agentic-service:8001"
+
+  # CORS / application configuration
+  FRONTEND_URL: "https://careerforge.com"
+
+  # Application server
+  PORT: "8000"
