@@ -21,48 +21,111 @@ env:
 
 jobs:
   build-and-deploy:
-    name: Build and Deploy Frontend
     runs-on: ubuntu-latest
 
     steps:
+
+      # --------------------------------------------------
+      # Checkout
+      # --------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      # --------------------------------------------------
+      # AWS OIDC
+      # --------------------------------------------------
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      # --------------------------------------------------
+      # ECR Login
+      # --------------------------------------------------
       - name: Login to Amazon ECR
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
+      # --------------------------------------------------
+      # Check whether this commit image already exists
+      # --------------------------------------------------
+      - name: Check if image already exists
+        id: image-check
+        run: |
+          if aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="${GITHUB_SHA}" \
+            >/dev/null 2>&1; then
+
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+
+            echo "========================================="
+            echo "Image already exists"
+            echo "Repository: $ECR_REPOSITORY"
+            echo "Tag:        $GITHUB_SHA"
+            echo "Skipping Docker build and push."
+            echo "========================================="
+
+          else
+
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+
+            echo "========================================="
+            echo "Image does not exist"
+            echo "Repository: $ECR_REPOSITORY"
+            echo "Tag:        $GITHUB_SHA"
+            echo "Building and pushing image."
+            echo "========================================="
+
+          fi
+
+      # --------------------------------------------------
+      # Docker Buildx
+      # --------------------------------------------------
       - name: Set up Docker Buildx
+        if: steps.image-check.outputs.exists != 'true'
         uses: docker/setup-buildx-action@v3
 
+      # --------------------------------------------------
+      # Multi-platform build + push
+      # --------------------------------------------------
       - name: Build and push multi-platform image
+        if: steps.image-check.outputs.exists != 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
-          platforms: linux/amd64,linux/arm64
+
+          platforms: |
+            linux/amd64
+            linux/arm64
+
           push: true
+
           tags: |
             ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
-            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # --------------------------------------------------
+      # Configure kubectl
+      # --------------------------------------------------
       - name: Configure kubectl
         run: |
           aws eks update-kubeconfig \
             --region "$AWS_REGION" \
             --name "$EKS_CLUSTER_NAME"
 
+      # --------------------------------------------------
+      # Deploy
+      # --------------------------------------------------
       - name: Deploy frontend
         run: |
-          kubectl apply -f k8s/frontend/ -n "$NAMESPACE"
+          kubectl apply \
+            -f k8s/frontend/ \
+            -n "$NAMESPACE"
 
           kubectl -n "$NAMESPACE" set image deployment/frontend \
             frontend=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
