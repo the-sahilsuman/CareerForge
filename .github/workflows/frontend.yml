@@ -51,6 +51,25 @@ jobs:
           aws sts get-caller-identity
 
       # --------------------------------------------------
+      # Generate unique image tag
+      # --------------------------------------------------
+
+      - name: Generate image tag
+        id: image-tag
+        run: |
+          IMAGE_TAG="${GITHUB_SHA}-${GITHUB_RUN_NUMBER}"
+
+          echo "IMAGE_TAG=$IMAGE_TAG" >> "$GITHUB_ENV"
+
+          echo "========================================="
+          echo "Docker Image Tag"
+          echo "========================================="
+          echo "Commit SHA : $GITHUB_SHA"
+          echo "Run Number : $GITHUB_RUN_NUMBER"
+          echo "Image Tag  : $IMAGE_TAG"
+          echo "========================================="
+
+      # --------------------------------------------------
       # ECR Login
       # --------------------------------------------------
 
@@ -59,53 +78,17 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       # --------------------------------------------------
-      # Check whether this commit image already exists
-      # --------------------------------------------------
-
-      - name: Check if image already exists
-        id: image-check
-        run: |
-          if aws ecr describe-images \
-            --repository-name "$ECR_REPOSITORY" \
-            --image-ids imageTag="${GITHUB_SHA}" \
-            >/dev/null 2>&1; then
-
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-
-            echo "========================================="
-            echo "Image already exists"
-            echo "Repository: $ECR_REPOSITORY"
-            echo "Tag:        $GITHUB_SHA"
-            echo "Skipping Docker build and push."
-            echo "========================================="
-
-          else
-
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-
-            echo "========================================="
-            echo "Image does not exist"
-            echo "Repository: $ECR_REPOSITORY"
-            echo "Tag:        $GITHUB_SHA"
-            echo "Building and pushing image."
-            echo "========================================="
-
-          fi
-
-      # --------------------------------------------------
       # Docker Buildx
       # --------------------------------------------------
 
       - name: Set up Docker Buildx
-        if: steps.image-check.outputs.exists != 'true'
         uses: docker/setup-buildx-action@v3
 
       # --------------------------------------------------
-      # Multi-platform build + push
+      # Build and push multi-platform image
       # --------------------------------------------------
 
       - name: Build and push multi-platform image
-        if: steps.image-check.outputs.exists != 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
@@ -118,7 +101,7 @@ jobs:
           push: true
 
           tags: |
-            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
 
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -144,40 +127,31 @@ jobs:
 
       # --------------------------------------------------
       # Ensure namespace exists
-      #
-      # If careerforge already exists:
-      #   nothing is changed.
-      #
-      # If careerforge does not exist:
-      #   namespace.yml creates it.
       # --------------------------------------------------
 
       - name: Ensure namespace exists
         run: |
-          echo "Checking namespace: $NAMESPACE"
-
           if kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
+
             echo "========================================="
             echo "Namespace already exists"
             echo "Namespace: $NAMESPACE"
             echo "========================================="
+
           else
+
             echo "========================================="
             echo "Namespace does not exist"
-            echo "Creating namespace from:"
-            echo "k8s/namespace.yml"
+            echo "Creating from k8s/namespace.yml"
             echo "========================================="
 
             kubectl apply -f k8s/namespace.yml
-
-            echo "Waiting for namespace to become available..."
 
             kubectl wait \
               --for=jsonpath='{.status.phase}'=Active \
               namespace/"$NAMESPACE" \
               --timeout=60s
 
-            echo "Namespace created successfully."
           fi
 
       # --------------------------------------------------
@@ -199,31 +173,32 @@ jobs:
           echo "Deploying CareerForge Frontend"
           echo "========================================="
 
-          echo "Namespace: $NAMESPACE"
-          echo "ECR Repository: $ECR_REPOSITORY"
-          echo "Image Tag: $GITHUB_SHA"
+          echo "ECR Repository : $ECR_REPOSITORY"
+          echo "Image Tag      : $IMAGE_TAG"
+          echo "Namespace      : $NAMESPACE"
 
           # Apply Kubernetes manifests
           kubectl apply \
             -f k8s/frontend/ \
             -n "$NAMESPACE"
 
-          # Update deployment image
+          # Update deployment to NEW immutable image
           kubectl -n "$NAMESPACE" set image \
             deployment/frontend \
-            frontend=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+            frontend=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
 
-          # Wait for deployment
+          # Wait for rollout
           kubectl -n "$NAMESPACE" rollout status \
             deployment/frontend \
             --timeout=5m
 
       # --------------------------------------------------
-      # Deployment verification
+      # Verify deployment
       # --------------------------------------------------
 
       - name: Verify frontend deployment
         run: |
+
           echo "========================================="
           echo "Frontend Deployment"
           echo "========================================="
@@ -235,7 +210,8 @@ jobs:
           echo "Frontend Pods"
           echo "========================================="
 
-          kubectl -n "$NAMESPACE" get pods -l app=frontend
+          kubectl -n "$NAMESPACE" get pods \
+            -l app=frontend
 
           echo ""
           echo "========================================="
@@ -243,3 +219,13 @@ jobs:
           echo "========================================="
 
           kubectl -n "$NAMESPACE" get service frontend
+
+          echo ""
+          echo "========================================="
+          echo "Current Image"
+          echo "========================================="
+
+          kubectl -n "$NAMESPACE" get deployment frontend \
+            -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+          echo ""
