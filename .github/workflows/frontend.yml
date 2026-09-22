@@ -28,12 +28,14 @@ jobs:
       # --------------------------------------------------
       # Checkout
       # --------------------------------------------------
+
       - name: Checkout repository
         uses: actions/checkout@v6
 
       # --------------------------------------------------
       # AWS OIDC
       # --------------------------------------------------
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -41,8 +43,17 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       # --------------------------------------------------
+      # Verify AWS identity
+      # --------------------------------------------------
+
+      - name: Verify AWS identity
+        run: |
+          aws sts get-caller-identity
+
+      # --------------------------------------------------
       # ECR Login
       # --------------------------------------------------
+
       - name: Login to Amazon ECR
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
@@ -50,6 +61,7 @@ jobs:
       # --------------------------------------------------
       # Check whether this commit image already exists
       # --------------------------------------------------
+
       - name: Check if image already exists
         id: image-check
         run: |
@@ -83,6 +95,7 @@ jobs:
       # --------------------------------------------------
       # Docker Buildx
       # --------------------------------------------------
+
       - name: Set up Docker Buildx
         if: steps.image-check.outputs.exists != 'true'
         uses: docker/setup-buildx-action@v3
@@ -90,6 +103,7 @@ jobs:
       # --------------------------------------------------
       # Multi-platform build + push
       # --------------------------------------------------
+
       - name: Build and push multi-platform image
         if: steps.image-check.outputs.exists != 'true'
         uses: docker/build-push-action@v6
@@ -112,6 +126,7 @@ jobs:
       # --------------------------------------------------
       # Configure kubectl
       # --------------------------------------------------
+
       - name: Configure kubectl
         run: |
           aws eks update-kubeconfig \
@@ -119,16 +134,112 @@ jobs:
             --name "$EKS_CLUSTER_NAME"
 
       # --------------------------------------------------
-      # Deploy
+      # Verify EKS connection
       # --------------------------------------------------
+
+      - name: Verify EKS connection
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      # --------------------------------------------------
+      # Ensure namespace exists
+      #
+      # If careerforge already exists:
+      #   nothing is changed.
+      #
+      # If careerforge does not exist:
+      #   namespace.yml creates it.
+      # --------------------------------------------------
+
+      - name: Ensure namespace exists
+        run: |
+          echo "Checking namespace: $NAMESPACE"
+
+          if kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
+            echo "========================================="
+            echo "Namespace already exists"
+            echo "Namespace: $NAMESPACE"
+            echo "========================================="
+          else
+            echo "========================================="
+            echo "Namespace does not exist"
+            echo "Creating namespace from:"
+            echo "k8s/namespace.yml"
+            echo "========================================="
+
+            kubectl apply -f k8s/namespace.yml
+
+            echo "Waiting for namespace to become available..."
+
+            kubectl wait \
+              --for=jsonpath='{.status.phase}'=Active \
+              namespace/"$NAMESPACE" \
+              --timeout=60s
+
+            echo "Namespace created successfully."
+          fi
+
+      # --------------------------------------------------
+      # Verify namespace
+      # --------------------------------------------------
+
+      - name: Verify namespace
+        run: |
+          kubectl get namespace "$NAMESPACE"
+
+      # --------------------------------------------------
+      # Deploy frontend
+      # --------------------------------------------------
+
       - name: Deploy frontend
         run: |
+
+          echo "========================================="
+          echo "Deploying CareerForge Frontend"
+          echo "========================================="
+
+          echo "Namespace: $NAMESPACE"
+          echo "ECR Repository: $ECR_REPOSITORY"
+          echo "Image Tag: $GITHUB_SHA"
+
+          # Apply Kubernetes manifests
           kubectl apply \
             -f k8s/frontend/ \
             -n "$NAMESPACE"
 
-          kubectl -n "$NAMESPACE" set image deployment/frontend \
+          # Update deployment image
+          kubectl -n "$NAMESPACE" set image \
+            deployment/frontend \
             frontend=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
 
-          kubectl -n "$NAMESPACE" rollout status deployment/frontend \
+          # Wait for deployment
+          kubectl -n "$NAMESPACE" rollout status \
+            deployment/frontend \
             --timeout=5m
+
+      # --------------------------------------------------
+      # Deployment verification
+      # --------------------------------------------------
+
+      - name: Verify frontend deployment
+        run: |
+          echo "========================================="
+          echo "Frontend Deployment"
+          echo "========================================="
+
+          kubectl -n "$NAMESPACE" get deployment frontend
+
+          echo ""
+          echo "========================================="
+          echo "Frontend Pods"
+          echo "========================================="
+
+          kubectl -n "$NAMESPACE" get pods -l app=frontend
+
+          echo ""
+          echo "========================================="
+          echo "Frontend Service"
+          echo "========================================="
+
+          kubectl -n "$NAMESPACE" get service frontend
