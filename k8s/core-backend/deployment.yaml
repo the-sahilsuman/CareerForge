@@ -5,13 +5,15 @@ metadata:
   namespace: careerforge
   labels:
     app: core-backend
-    app.kubernetes.io/part-of: careerforge
 
 spec:
   replicas: 2
 
+  revisionHistoryLimit: 5
+
   strategy:
     type: RollingUpdate
+
     rollingUpdate:
       maxUnavailable: 0
       maxSurge: 1
@@ -24,40 +26,41 @@ spec:
     metadata:
       labels:
         app: core-backend
-        app.kubernetes.io/part-of: careerforge
 
     spec:
+
       serviceAccountName: core-backend
+
+      terminationGracePeriodSeconds: 30
 
       containers:
         - name: core-backend
 
-          image: ACCOUNT_ID.dkr.ecr.ap-south-1.amazonaws.com/careerforge-core-backend:IMAGE_TAG
+          image: 142545058839.dkr.ecr.ap-south-1.amazonaws.com/careerforge/core-backend:v1
 
           imagePullPolicy: IfNotPresent
 
           ports:
             - name: http
               containerPort: 8000
+              protocol: TCP
 
           envFrom:
 
-            # Non-sensitive configuration
             - configMapRef:
                 name: core-backend-config
 
-            # Sensitive configuration
             - secretRef:
-                name: core-backend-secret
+                name: core-backend-secrets
 
           resources:
             requests:
-              cpu: "250m"
-              memory: "512Mi"
+              cpu: 250m
+              memory: 512Mi
 
             limits:
-              cpu: "1000m"
-              memory: "1Gi"
+              cpu: 1000m
+              memory: 1Gi
 
           readinessProbe:
             httpGet:
@@ -67,7 +70,7 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 5
+            failureThreshold: 6
 
           livenessProbe:
             httpGet:
@@ -79,6 +82,8 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
 
-          terminationMessagePolicy: File
-
-      terminationGracePeriodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL

@@ -5,10 +5,10 @@ metadata:
   namespace: careerforge
   labels:
     app: frontend
-    app.kubernetes.io/part-of: careerforge
-
 spec:
   replicas: 2
+
+  revisionHistoryLimit: 5
 
   strategy:
     type: RollingUpdate
@@ -24,33 +24,34 @@ spec:
     metadata:
       labels:
         app: frontend
-        app.kubernetes.io/part-of: careerforge
 
     spec:
       containers:
         - name: frontend
 
-          image: ACCOUNT_ID.dkr.ecr.ap-south-1.amazonaws.com/careerforge-frontend:IMAGE_TAG
+          image: 142545058839.dkr.ecr.ap-south-1.amazonaws.com/careerforge/frontend:v1
 
           imagePullPolicy: IfNotPresent
 
           ports:
             - name: http
               containerPort: 80
+              protocol: TCP
 
           resources:
             requests:
-              cpu: "100m"
-              memory: "128Mi"
+              cpu: 100m
+              memory: 128Mi
 
             limits:
-              cpu: "500m"
-              memory: "512Mi"
+              cpu: 500m
+              memory: 512Mi
 
           readinessProbe:
             httpGet:
-              path: /health
+              path: /
               port: http
+
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 3
@@ -58,9 +59,17 @@ spec:
 
           livenessProbe:
             httpGet:
-              path: /health
+              path: /
               port: http
+
             initialDelaySeconds: 15
             periodSeconds: 20
             timeoutSeconds: 3
             failureThreshold: 3
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL

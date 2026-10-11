@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentic-service-config
+  namespace: careerforge
+
+data:
+
+  APP_NAME: "CareerForge Agentic Service"
+
+  APP_VERSION: "1.0.0"
+
+  DEBUG: "true"
+
+  LOG_LEVEL: "INFO"
+
+  AWS_REGION: "ap-south-1"
+
+  AWS_STARTUP_CHECK: "true"
+
+  CORE_BACKEND_URL: "http://core-backend:8000"
+
+  REDIS_HOST: "careerforge-qljqff.serverless.aps1.cache.amazonaws.com"
+
+  REDIS_PORT: "6379"
+
+  REDIS_SSL: "true"
+
+  REDIS_SESSION_TTL: "3600"
+
+  CHAT_MEMORY_TTL_SECONDS: "3600"
+
+  RESUME_S3_BUCKET_NAME: "careerforge-prod"
+
+  S3_BUCKET: "careerforge-prod"
+
+  S3_VECTOR_BUCKET_NAME: "careerforge-vectors"
+
+  S3_VECTOR_INDEX_NAME: "knowledge-chunks"
+
+  S3_VECTOR_INDEX_ARN: "arn:aws:s3vectors:ap-south-1:142545058839:bucket/careerforge-vectors/index/knowledge-chunks"
+
+  INGESTION_QUEUE_URL: "https://sqs.ap-south-1.amazonaws.com/142545058839/careerforge-ingestion-queue"
+
+  SQS_MAX_MESSAGES: "5"
+
+  SQS_WAIT_TIME_SECONDS: "20"
+
+  SQS_VISIBILITY_TIMEOUT: "300"
+
+  SQS_ERROR_RETRY_SECONDS: "5"
+
+  CHUNK_SIZE: "1000"
+
+  CHUNK_OVERLAP: "150"
+
+  LLM_PROVIDER: "huggingface"
+
+  LLM_TEMPERATURE: "0.2"
+
+  LLM_MAX_TOKENS: "2048"
+
+  BEDROCK_MODEL_ID: "CHANGE_ME"
+
+  BEDROCK_AWS_REGION: "ap-south-1"
+
+  GEMINI_MODEL_ID: "gemini-2.5-flash"
+
+  OPENAI_MODEL_ID: "gpt-5-mini"
+
+  HUGGINGFACE_BASE_URL: "https://router.huggingface.co/v1"
+
+  OPENROUTER_BASE_URL: "https://openrouter.ai/api/v1"
+
+  EMBEDDING_PROVIDER: "gemini"
+
+  EMBEDDING_DIMENSIONS: "1024"
+
+  BEDROCK_EMBEDDING_MODEL_ID: "amazon.titan-embed-text-v2:0"
+
+  GEMINI_EMBEDDING_MODEL: "models/gemini-embedding-001"
+
+  OPENROUTER_EMBEDDING_DIMENSIONS: "1024"

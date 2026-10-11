@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: core-backend-config
+  namespace: careerforge
+
+data:
+
+  APP_NAME: "CareerForge Core Backend"
+
+  DEBUG: "false"
+
+  AWS_REGION: "ap-south-1"
+
+  LOG_LEVEL: "INFO"
+
+  FRONTEND_URL: "https://careerforge.example.com"
+
+  AGENTIC_SERVICE_URL: "http://agentic-service:8001"
+
+  S3_BUCKET_NAME: "careerforge-prod"
+
+  AWS_BUCKET_NAME: "careerforge-prod"
+
+  COGNITO_USER_POOL_ID: "ap-south-1_GGqS8rEHI"
+
+  COGNITO_CLIENT_ID: "49pqe0efte505dlkqb8r66p88r"
+
+  CORS_ORIGINS: "https://careerforge.example.com"
+
+  GOOGLE_REDIRECT_URI: "https://api.careerforge.example.com/api/v1/email/google/callback"
+
+  INGESTION_QUEUE_URL: "https://sqs.ap-south-1.amazonaws.com/142545058839/careerforge-ingestion-queue"
+
+  INGESTION_DLQ_URL: "CHANGE_ME"

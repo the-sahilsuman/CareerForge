@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: core-backend
   namespace: careerforge
+  labels:
+    app: core-backend
 
 spec:
   type: ClusterIP
@@ -13,5 +15,5 @@ spec:
   ports:
     - name: http
       port: 8000
-      targetPort: http
+      targetPort: 8000
       protocol: TCP
